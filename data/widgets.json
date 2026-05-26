@@ -1,0 +1,34 @@
+[
+  {
+    "id": "m2-1-energy-transformation-html",
+    "filename": "m2.1 Energy Transformation.html",
+    "title": "Energy Transformation",
+    "description": "Explore how electrical energy transforms into other forms of energy through interactive simulations.",
+    "category": "DC",
+    "addedAt": "2026-05-22"
+  },
+  {
+    "id": "m2-3-voltage-as-pressure-html",
+    "filename": "m2.3 Voltage as pressure.html",
+    "title": "Voltage as Pressure",
+    "description": "Understand voltage through the water pressure analogy — an intuitive model for electric potential.",
+    "category": "DC",
+    "addedAt": "2026-05-22"
+  },
+  {
+    "id": "m3-2-ohm-s-law-html",
+    "filename": "m3.2 Ohm's law.html",
+    "title": "Ohm's Law Lab",
+    "description": "Interactively explore the relationship between voltage, current, and resistance in electrical circuits.",
+    "category": "DC",
+    "addedAt": "2026-05-22"
+  },
+  {
+    "id": "m2-3-snap-circuits-3-0-html",
+    "filename": "m2.3 snap_circuits_3.0.html",
+    "title": "snap_circuits_3.0",
+    "description": "",
+    "category": "Uncategorized",
+    "addedAt": "2026-05-22"
+  }
+]

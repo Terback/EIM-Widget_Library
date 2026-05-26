@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EIM Widget Library</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Topbar -->
+  <nav class="navbar">
+    <a class="nav-brand" href="/">
+      <div class="nav-brand-text">
+        <div class="nav-brand-title">EIM Widget Library</div>
+        <div class="nav-brand-sub">Interactive HTML Modules</div>
+      </div>
+    </a>
+    <div class="nav-spacer"></div>
+    <div class="nav-actions">
+      <span id="roleTag" class="role-tag hidden"></span>
+      <button id="uploadBtn" class="btn btn-primary hidden">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Add Widget
+      </button>
+      <button id="loginBtn" class="btn btn-ghost">Admin Login</button>
+      <button id="logoutBtn" class="btn btn-ghost hidden">Logout</button>
+    </div>
+  </nav>
+
+  <!-- Hero strip -->
+  <div class="hero">
+    <div class="hero-head">
+      <h1 id="heroCount">Loading widgets…</h1>
+      <p>Interactive HTML widgets — click any card to launch</p>
+    </div>
+    <div class="hero-tools">
+      <div class="search-wrap">
+        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input type="text" id="search" placeholder="Search widgets…" autocomplete="off">
+      </div>
+      <select id="categoryFilter">
+        <option value="">All Categories</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <main class="container">
+    <div id="widgetGrid" class="widget-grid"></div>
+    <div id="emptyState" class="empty-state hidden">
+      <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <p>No widgets match your search.</p>
+    </div>
+  </main>
+
+  <!-- ── Login Modal ── -->
+  <div id="loginModal" class="modal-backdrop hidden">
+    <div class="modal-box" style="max-width:380px">
+      <div class="modal-header">
+        <h2>Admin Login</h2>
+        <button class="close-btn" data-close="loginModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <label>Password</label>
+        <input type="password" id="passwordInput" placeholder="Enter admin password" autocomplete="current-password">
+        <p id="loginError" class="form-error hidden">Incorrect password.</p>
+      </div>
+      <div class="modal-footer">
+        <button id="loginSubmit" class="btn btn-primary" style="width:100%">Login</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Upload Modal ── -->
+  <div id="uploadModal" class="modal-backdrop hidden">
+    <div class="modal-box" style="max-width:460px">
+      <div class="modal-header">
+        <h2>Add Widget</h2>
+        <button class="close-btn" data-close="uploadModal">✕</button>
+      </div>
+      <form id="uploadForm">
+        <div class="modal-body">
+          <label>HTML File <span class="req">*</span></label>
+          <input type="file" id="widgetFile" accept=".html" required>
+          <label>Title</label>
+          <input type="text" id="widgetTitle" placeholder="e.g. Ohm's Law Lab">
+          <label>Category</label>
+          <select id="widgetCategory"></select>
+          <input type="text" id="widgetCategoryNew" class="hidden" placeholder="New category name">
+          <label>Description</label>
+          <textarea id="widgetDesc" rows="3" placeholder="Short description…"></textarea>
+          <p id="uploadError" class="form-error hidden"></p>
+          <p id="uploadSuccess" class="form-success hidden">Widget added!</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" data-close="uploadModal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Upload</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Edit Modal ── -->
+  <div id="editModal" class="modal-backdrop hidden">
+    <div class="modal-box" style="max-width:460px">
+      <div class="modal-header">
+        <h2>Edit Widget</h2>
+        <button class="close-btn" data-close="editModal">✕</button>
+      </div>
+      <form id="editForm">
+        <div class="modal-body">
+          <input type="hidden" id="editId">
+          <label>Title</label>
+          <input type="text" id="editTitle">
+          <label>Category</label>
+          <select id="editCategory"></select>
+          <input type="text" id="editCategoryNew" class="hidden" placeholder="New category name">
+          <label>Description</label>
+          <textarea id="editDesc" rows="3"></textarea>
+          <p id="editError" class="form-error hidden"></p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" data-close="editModal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Confirm Delete Modal ── -->
+  <div id="deleteModal" class="modal-backdrop hidden">
+    <div class="modal-box" style="max-width:360px">
+      <div class="modal-header">
+        <h2>Delete Widget?</h2>
+        <button class="close-btn" data-close="deleteModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <p>This will permanently remove <strong id="deleteTitle"></strong> and its HTML file. This cannot be undone.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" data-close="deleteModal">Cancel</button>
+        <button id="deleteConfirm" class="btn btn-danger">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Widget Viewer ── -->
+  <div id="viewerModal" class="viewer-backdrop hidden">
+    <div class="viewer-shell">
+      <div class="viewer-bar">
+        <span id="viewerTitle"></span>
+        <div class="viewer-bar-actions">
+          <a id="viewerNewTab" href="#" target="_blank" class="btn btn-outline btn-sm">Open in new tab</a>
+          <button id="viewerClose" class="close-btn">✕</button>
+        </div>
+      </div>
+      <iframe id="widgetFrame" src="" frameborder="0" allowfullscreen></iframe>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/appwrite@17.0.0"></script>
+  <script src="appwrite-config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

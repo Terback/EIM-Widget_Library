@@ -1,0 +1,220 @@
+const express = require('express');
+const session = require('express-session');
+const multer = require('multer');
+const fs = require('fs');
+const path = require('path');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+const WIDGETS_DIR = path.join(__dirname, 'widgets');
+const DATA_FILE = path.join(__dirname, 'data', 'widgets.json');
+const CAT_FILE  = path.join(__dirname, 'data', 'categories.json');
+const SOURCE_DIR = 'C:\\Users\\sunny\\Documents\\widgets';
+const DEFAULT_CATEGORIES = ['DC', 'AC', 'MCU'];
+
+// Ensure dirs exist
+[WIDGETS_DIR, path.join(__dirname, 'data')].forEach(d => {
+    if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+});
+
+// Seed from source on first run
+if (fs.existsSync(SOURCE_DIR)) {
+    const destFiles = new Set(fs.readdirSync(WIDGETS_DIR));
+    fs.readdirSync(SOURCE_DIR).filter(f => f.endsWith('.html')).forEach(f => {
+        if (!destFiles.has(f))
+            fs.copyFileSync(path.join(SOURCE_DIR, f), path.join(WIDGETS_DIR, f));
+    });
+}
+
+function loadMeta() {
+    try { return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); }
+    catch { return []; }
+}
+
+function saveMeta(data) {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+}
+
+function loadCategories() {
+    try {
+        const arr = JSON.parse(fs.readFileSync(CAT_FILE, 'utf8'));
+        if (Array.isArray(arr) && arr.length) return arr;
+    } catch {}
+    saveCategories(DEFAULT_CATEGORIES);
+    return [...DEFAULT_CATEGORIES];
+}
+
+function saveCategories(arr) {
+    fs.writeFileSync(CAT_FILE, JSON.stringify(arr, null, 2));
+}
+
+function addCategoryIfNew(name) {
+    if (!name) return;
+    const cats = loadCategories();
+    if (!cats.some(c => c.toLowerCase() === name.toLowerCase())) {
+        cats.push(name);
+        saveCategories(cats);
+    }
+}
+
+function makeid(filename) {
+    return filename.replace(/[^a-z0-9]/gi, '-').toLowerCase().replace(/-+/g, '-').replace(/^-|-$/g, '');
+}
+
+function inferTitle(filename) {
+    // Strip leading module code like "m2.3 " or "m3.2 "
+    return filename.replace(/\.html$/i, '').replace(/^m[\d.]+\s+/i, '');
+}
+
+function syncMeta() {
+    const files = fs.readdirSync(WIDGETS_DIR).filter(f => f.endsWith('.html'));
+    let meta = loadMeta();
+    const known = new Set(meta.map(w => w.filename));
+
+    files.forEach(f => {
+        if (!known.has(f)) {
+            meta.push({
+                id: makeid(f),
+                filename: f,
+                title: inferTitle(f),
+                description: '',
+                category: 'Uncategorized',
+                addedAt: new Date().toISOString().split('T')[0]
+            });
+        }
+    });
+
+    meta = meta.filter(w => files.includes(w.filename));
+    saveMeta(meta);
+    return meta;
+}
+
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+// Trust reverse proxy (nginx/traefik) so secure cookies work behind TLS
+if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
+
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'wl-secret-k9x2p7q',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        maxAge: 8 * 60 * 60 * 1000,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax'
+    }
+}));
+app.use(express.static(path.join(__dirname, 'public')));
+app.use('/widgets', express.static(WIDGETS_DIR));
+
+// File upload
+const storage = multer.diskStorage({
+    destination: WIDGETS_DIR,
+    filename: (req, file, cb) => cb(null, file.originalname)
+});
+const upload = multer({
+    storage,
+    fileFilter: (req, file, cb) => {
+        if (file.originalname.toLowerCase().endsWith('.html')) cb(null, true);
+        else cb(new Error('Only .html files are allowed'));
+    },
+    limits: { fileSize: 20 * 1024 * 1024 }
+});
+
+function adminOnly(req, res, next) {
+    if (req.session.role === 'admin') return next();
+    res.status(403).json({ error: 'Admin only' });
+}
+
+// --- Routes ---
+
+app.post('/api/login', (req, res) => {
+    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+    if (req.body.password === adminPassword) {
+        req.session.role = 'admin';
+        return res.json({ role: 'admin' });
+    }
+    res.status(401).json({ error: 'Invalid password' });
+});
+
+app.post('/api/logout', (req, res) => {
+    req.session.destroy(() => res.json({ ok: true }));
+});
+
+app.get('/api/session', (req, res) => {
+    res.json({ role: req.session.role || 'visitor' });
+});
+
+app.get('/api/widgets', (req, res) => {
+    res.json(syncMeta());
+});
+
+app.get('/api/categories', (req, res) => {
+    res.json(loadCategories());
+});
+
+app.post('/api/categories', adminOnly, (req, res) => {
+    const name = (req.body.name || '').trim();
+    if (!name) return res.status(400).json({ error: 'Name required' });
+    if (name.length > 32) return res.status(400).json({ error: 'Name too long (max 32 chars)' });
+    addCategoryIfNew(name);
+    res.json({ ok: true, categories: loadCategories() });
+});
+
+app.delete('/api/categories/:name', adminOnly, (req, res) => {
+    const target = req.params.name.toLowerCase();
+    const cats = loadCategories().filter(c => c.toLowerCase() !== target);
+    saveCategories(cats);
+    res.json({ ok: true, categories: cats });
+});
+
+app.post('/api/widgets', adminOnly, upload.single('file'), (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'No file received' });
+    const { title, description, category } = req.body;
+    const filename = req.file.originalname;
+    let meta = loadMeta();
+    const idx = meta.findIndex(w => w.filename === filename);
+    const entry = {
+        id: makeid(filename),
+        filename,
+        title: (title && title.trim()) || inferTitle(filename),
+        description: description || '',
+        category: (category && category.trim()) || 'General',
+        addedAt: new Date().toISOString().split('T')[0]
+    };
+    if (idx >= 0) meta[idx] = entry;
+    else meta.push(entry);
+    saveMeta(meta);
+    addCategoryIfNew(entry.category);
+    res.json({ ok: true, widget: entry });
+});
+
+app.put('/api/widgets/:id', adminOnly, (req, res) => {
+    let meta = loadMeta();
+    const idx = meta.findIndex(w => w.id === req.params.id);
+    if (idx < 0) return res.status(404).json({ error: 'Not found' });
+    const { title, description, category } = req.body;
+    if (title !== undefined) meta[idx].title = title;
+    if (description !== undefined) meta[idx].description = description;
+    if (category !== undefined) {
+        meta[idx].category = category;
+        addCategoryIfNew(category);
+    }
+    saveMeta(meta);
+    res.json({ ok: true, widget: meta[idx] });
+});
+
+app.delete('/api/widgets/:id', adminOnly, (req, res) => {
+    let meta = loadMeta();
+    const widget = meta.find(w => w.id === req.params.id);
+    if (!widget) return res.status(404).json({ error: 'Not found' });
+    try { fs.unlinkSync(path.join(WIDGETS_DIR, widget.filename)); } catch {}
+    saveMeta(meta.filter(w => w.id !== req.params.id));
+    res.json({ ok: true });
+});
+
+app.listen(PORT, () => {
+    console.log(`Widget Library → http://localhost:${PORT}`);
+});
