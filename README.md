@@ -141,7 +141,7 @@ Please contact EIM Technology for commercial usage or collaboration inquiries.
 
 # Author
 
-Developed by Terrence Dai  
+Developed by Terrence Dai and Sunny Gong
 EIM Technology  
 Vancouver, Canada
 
